@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SmartReader – AI Learning Companion</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;500;600;700;800&family=Hind:wght@300;400;500;600&display=swap');
+
+:root {
+  --saffron: #FF6B00;
+  --saffron-light: #FFF0E5;
+  --saffron-mid: #FFB380;
+  --indigo: #3730A3;
+  --indigo-light: #EEF2FF;
+  --indigo-mid: #818CF8;
+  --teal: #0D9488;
+  --teal-light: #CCFBF1;
+  --teal-mid: #5EEAD4;
+  --rose: #E11D48;
+  --rose-light: #FFF1F2;
+  --gold: #D97706;
+  --gold-light: #FFFBEB;
+  --green: #059669;
+  --green-light: #ECFDF5;
+  --bg: #FDFAF6;
+  --surface: #FFFFFF;
+  --border: #E8E0D4;
+  --text: #1C1917;
+  --text2: #57534E;
+  --text3: #A8A29E;
+  --radius: 12px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Hind', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── PASSWORD GATE ── */
+#gate {
+  position: fixed; inset: 0; z-index: 9999;
+  background: linear-gradient(135deg, #1E1B4B 0%, #3730A3 45%, #FF6B00 100%);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.gate-card {
+  background: white; border-radius: 20px; padding: 40px 36px;
+  width: 100%; max-width: 400px; text-align: center;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.4);
+}
+.gate-logo {
+  width: 64px; height: 64px; border-radius: 16px;
+  background: linear-gradient(135deg, var(--saffron), var(--indigo));
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 16px; font-size: 28px;
+}
+.gate-card h1 { font-family: 'Baloo 2', sans-serif; font-size: 22px; font-weight: 800; color: var(--indigo); margin-bottom: 4px; }
+.gate-card p { font-size: 13px; color: var(--text2); margin-bottom: 24px; }
+.gate-input {
+  width: 100%; font-size: 16px; padding: 12px 16px; border-radius: 10px;
+  border: 2px solid var(--border); background: var(--bg); color: var(--text);
+  font-family: inherit; outline: none; text-align: center; letter-spacing: 0.1em;
+  margin-bottom: 12px; transition: border-color 0.2s;
+}
+.gate-input:focus { border-color: var(--indigo); }
+.gate-btn {
+  width: 100%; padding: 13px; font-family: 'Baloo 2', sans-serif;
+  font-size: 16px; font-weight: 700; background: linear-gradient(135deg, var(--saffron), #FF8C42);
+  color: white; border: none; border-radius: 10px; cursor: pointer;
+  box-shadow: 0 4px 14px rgba(255,107,0,0.4); transition: opacity 0.2s;
+}
+.gate-btn:hover { opacity: 0.9; }
+.gate-error { font-size: 12px; color: var(--rose); margin-top: 8px; font-weight: 600; display: none; }
+
+/* ── APP SHELL ── */
+#app { display: none; flex-direction: column; height: 100vh; }
+
+/* TOPBAR */
+.topbar {
+  background: linear-gradient(90deg, #1E1B4B, var(--indigo));
+  padding: 0 20px; height: 56px;
+  display: flex; align-items: center; gap: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2); flex-shrink: 0;
+}
+.topbar-logo { font-size: 20px; }
+.topbar-title { font-family: 'Baloo 2', sans-serif; font-size: 18px; font-weight: 800; color: #fff; }
+.topbar-sub { font-size: 12px; color: rgba(255,255,255,0.6); margin-left: 4px; }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.page-badge {
+  background: rgba(255,255,255,0.15); color: white; font-size: 12px;
+  padding: 4px 10px; border-radius: 20px; font-weight: 500;
+}
+
+/* MAIN LAYOUT */
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  grid-template-rows: 1fr;
+  flex: 1; overflow: hidden;
+}
+
+/* ── LEFT PANEL ── */
+.left-panel { display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid var(--border); }
+
+/* UPLOAD ZONE */
+#upload-zone {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; padding: 40px;
+  background: var(--bg);
+}
+.upload-box {
+  border: 3px dashed var(--indigo-mid); border-radius: 20px;
+  padding: 60px 40px; text-align: center; cursor: pointer;
+  transition: all 0.2s; background: var(--indigo-light);
+  max-width: 440px; width: 100%;
+}
+.upload-box:hover { border-color: var(--indigo); background: #E0E7FF; transform: scale(1.01); }
+.upload-box.dragover { border-color: var(--saffron); background: var(--saffron-light); }
+.upload-icon { font-size: 56px; margin-bottom: 16px; }
+.upload-box h2 { font-family: 'Baloo 2', sans-serif; font-size: 20px; font-weight: 700; color: var(--indigo); margin-bottom: 8px; }
+.upload-box p { font-size: 14px; color: var(--text2); }
+#file-input { display: none; }
+.upload-hint { margin-top: 20px; font-size: 12px; color: var(--text3); }
+
+/* READER AREA */
+#reader-area { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+
+/* CONTROLS BAR */
+.controls-bar {
+  background: white; border-bottom: 1px solid var(--border);
+  padding: 10px 16px; display: flex; align-items: center; gap: 8px;
+  flex-wrap: wrap; flex-shrink: 0;
+}
+.ctrl-btn {
+  display: flex; align-items: center; gap: 5px;
+  padding: 6px 12px; border-radius: 8px; border: none;
+  font-family: inherit; font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all 0.15s;
+}
+.ctrl-btn.primary { background: var(--indigo); color: white; }
+.ctrl-btn.primary:hover { background: #2D27A0; }
+.ctrl-btn.secondary { background: var(--indigo-light); color: var(--indigo); }
+.ctrl-btn.secondary:hover { background: #DDE4FF; }
+.ctrl-btn.danger { background: var(--rose-light); color: var(--rose); }
+.ctrl-btn.danger:hover { background: #FFE0E6; }
+.ctrl-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.ctrl-sep { width: 1px; height: 28px; background: var(--border); margin: 0 4px; }
+.speed-wrap { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); }
+.speed-wrap input[type=range] { width: 80px; accent-color: var(--saffron); }
+.speed-val { font-weight: 600; color: var(--saffron); min-width: 28px; }
+
+/* TEXT DISPLAY */
+.text-display {
+  flex: 1; overflow-y: auto; padding: 24px 28px;
+  font-size: 17px; line-height: 1.9; color: var(--text);
+  font-family: 'Hind', sans-serif;
+}
+.para-block {
+  margin-bottom: 28px; padding: 20px 24px;
+  background: white; border-radius: 14px;
+  border: 1.5px solid var(--border);
+  box-shadow: var(--shadow);
+  transition: border-color 0.3s;
+  position: relative;
+}
+.para-block.active { border-color: var(--indigo-mid); box-shadow: 0 0 0 3px rgba(55,48,163,0.08); }
+.para-block.done { border-color: var(--teal-mid); }
+.para-num {
+  position: absolute; top: -10px; left: 16px;
+  background: var(--indigo); color: white;
+  font-size: 10px; font-weight: 700; padding: 2px 8px;
+  border-radius: 10px; letter-spacing: 0.05em;
+}
+.para-block.done .para-num { background: var(--teal); }
+
+.word-span {
+  cursor: pointer; border-radius: 3px; transition: background 0.15s;
+  display: inline;
+}
+.word-span:hover { background: var(--saffron-light); }
+.word-span.speaking { background: #FEF08A; color: #713F12; font-weight: 600; padding: 0 2px; border-radius: 3px; }
+.word-span.key-word { border-bottom: 2px solid var(--saffron); }
+.word-span.key-word.speaking { background: var(--saffron); color: white; }
+
+/* PARA ACTION BUTTONS */
+.para-actions {
+  margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap;
+}
+.para-action-btn {
+  padding: 6px 14px; border-radius: 8px; border: 1.5px solid;
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 5px;
+}
+.btn-notes { border-color: var(--gold); color: var(--gold); background: var(--gold-light); }
+.btn-notes:hover { background: #FDE68A; }
+.btn-quiz { border-color: var(--indigo); color: var(--indigo); background: var(--indigo-light); }
+.btn-quiz:hover { background: #DDE4FF; }
+
+/* NOTES BLOCK */
+.notes-block {
+  margin-top: 14px; background: var(--gold-light);
+  border: 1.5px solid #FCD34D; border-radius: 12px; padding: 16px 18px;
+  display: none;
+}
+.notes-block h4 { font-family: 'Baloo 2', sans-serif; font-size: 14px; font-weight: 700; color: var(--gold); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+.notes-content { font-size: 14px; line-height: 1.7; color: var(--text); }
+.notes-content p { margin-bottom: 6px; }
+.notes-content ul { padding-left: 18px; }
+.notes-content ul li { margin-bottom: 4px; }
+.notes-content table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+.notes-content th { background: #FCD34D; padding: 6px 10px; text-align: left; font-weight: 600; }
+.notes-content td { padding: 5px 10px; border-bottom: 1px solid #FDE68A; }
+
+/* QUIZ BLOCK */
+.quiz-block {
+  margin-top: 14px; background: var(--indigo-light);
+  border: 1.5px solid var(--indigo-mid); border-radius: 12px; padding: 16px 18px;
+  display: none;
+}
+.quiz-block h4 { font-family: 'Baloo 2', sans-serif; font-size: 14px; font-weight: 700; color: var(--indigo); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+.quiz-progress { font-size: 12px; color: var(--text2); margin-bottom: 10px; }
+.quiz-q { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 12px; line-height: 1.5; }
+.quiz-options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.quiz-opt {
+  padding: 9px 14px; border-radius: 8px; border: 1.5px solid var(--indigo-mid);
+  background: white; color: var(--text); font-family: inherit; font-size: 14px;
+  cursor: pointer; text-align: left; transition: all 0.15s; font-weight: 500;
+}
+.quiz-opt:hover:not(:disabled) { background: var(--indigo); color: white; border-color: var(--indigo); }
+.quiz-opt.correct { background: var(--green-light); border-color: var(--green); color: var(--green); }
+.quiz-opt.wrong { background: var(--rose-light); border-color: var(--rose); color: var(--rose); }
+.quiz-opt:disabled { cursor: not-allowed; }
+.quiz-fill-input {
+  width: 100%; padding: 9px 12px; border-radius: 8px;
+  border: 1.5px solid var(--indigo-mid); font-family: inherit; font-size: 14px;
+  outline: none; margin-bottom: 8px;
+}
+.quiz-fill-input:focus { border-color: var(--indigo); }
+.quiz-submit {
+  padding: 8px 18px; border-radius: 8px; border: none;
+  background: var(--indigo); color: white; font-family: inherit;
+  font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.15s;
+}
+.quiz-submit:hover { opacity: 0.85; }
+.quiz-feedback {
+  padding: 10px 14px; border-radius: 8px; font-size: 14px;
+  font-weight: 500; margin-bottom: 10px; display: none;
+}
+.quiz-feedback.correct { background: var(--green-light); color: var(--green); border: 1px solid var(--green); }
+.quiz-feedback.wrong { background: var(--rose-light); color: var(--rose); border: 1px solid var(--rose); }
+.quiz-next {
+  padding: 8px 18px; border-radius: 8px; border: none;
+  background: var(--teal); color: white; font-family: inherit;
+  font-size: 13px; font-weight: 600; cursor: pointer; display: none;
+}
+.quiz-score {
+  text-align: center; padding: 16px; background: white;
+  border-radius: 10px; display: none;
+}
+.quiz-score .score-num { font-family: 'Baloo 2', sans-serif; font-size: 36px; font-weight: 800; color: var(--indigo); }
+.quiz-score p { font-size: 14px; color: var(--text2); margin-top: 4px; }
+
+/* ── RIGHT PANEL ── */
+.right-panel {
+  display: flex; flex-direction: column; overflow: hidden;
+  background: white;
+}
+.right-header {
+  padding: 14px 16px; border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, #FFF7ED, #FFF0E5);
+  flex-shrink: 0;
+}
+.right-header h3 {
+  font-family: 'Baloo 2', sans-serif; font-size: 15px; font-weight: 700;
+  color: var(--saffron); display: flex; align-items: center; gap: 6px;
+}
+.right-header p { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.vocab-list { flex: 1; overflow-y: auto; padding: 10px; }
+.vocab-item {
+  padding: 10px 12px; border-radius: 10px; margin-bottom: 8px;
+  background: var(--bg); border: 1px solid var(--border);
+  cursor: pointer; transition: all 0.15s;
+}
+.vocab-item:hover { border-color: var(--saffron); background: var(--saffron-light); }
+.vocab-en {
+  font-size: 15px; font-weight: 700; color: var(--indigo);
+  display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
+}
+.vocab-en .speak-icon { font-size: 13px; opacity: 0.6; }
+.vocab-kn { font-size: 13px; color: var(--text2); font-weight: 500; }
+.vocab-kn-loading { font-size: 12px; color: var(--text3); font-style: italic; }
+.vocab-empty { padding: 30px 16px; text-align: center; color: var(--text3); font-size: 13px; }
+.vocab-empty .empty-icon { font-size: 36px; margin-bottom: 8px; }
+
+/* LOADING OVERLAY */
+.loading-overlay {
+  position: fixed; inset: 0; background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(4px); display: none; align-items: center;
+  justify-content: center; z-index: 500; flex-direction: column; gap: 12px;
+}
+.loading-overlay.show { display: flex; }
+.spinner-ring {
+  width: 48px; height: 48px; border: 4px solid var(--border);
+  border-top-color: var(--saffron); border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-size: 14px; color: var(--text2); font-weight: 500; }
+
+/* STATUS BAR */
+.status-bar {
+  padding: 6px 16px; background: var(--indigo-light);
+  border-top: 1px solid var(--border);
+  font-size: 12px; color: var(--indigo); font-weight: 500;
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+}
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); }
+.status-dot.speaking { background: var(--saffron); animation: pulse 1s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+/* SCROLLBARS */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* RESPONSIVE */
+@media(max-width: 700px) {
+  .layout { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+  .right-panel { max-height: 220px; border-right: none; border-top: 1px solid var(--border); }
+}
+
+/* NOTES LOADING */
+.ai-loading { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text3); padding: 8px 0; }
+.dot-flashing { width: 6px; height: 6px; background: var(--saffron); border-radius: 50%; animation: dotFlash 1s infinite alternate; }
+.dot-flashing:nth-child(2) { animation-delay: 0.3s; }
+.dot-flashing:nth-child(3) { animation-delay: 0.6s; }
+@keyframes dotFlash { from{opacity:0.2} to{opacity:1} }
+
+/* Page nav */
+.page-nav { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.page-nav button { padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: white; cursor: pointer; font-size: 13px; color: var(--text2); }
+.page-nav button:hover { background: var(--indigo-light); color: var(--indigo); }
+.page-nav span { font-size: 12px; color: var(--text2); white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<!-- PASSWORD GATE -->
+<div id="gate">
+  <div class="gate-card">
+    <div class="gate-logo">📚</div>
+    <h1>SmartReader</h1>
+    <p>AI-powered learning companion for Class VI–X students</p>
+    <input class="gate-input" type="password" id="gate-input" placeholder="Enter password" />
+    <button class="gate-btn" onclick="checkPw()">Enter the Classroom ↗</button>
+    <div class="gate-error" id="gate-err">Incorrect password. Please try again.</div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <div class="topbar">
+    <span class="topbar-logo">📖</span>
+    <span class="topbar-title">SmartReader</span>
+    <span class="topbar-sub">AI Learning Companion</span>
+    <div class="topbar-right">
+      <span class="page-badge" id="page-badge">No PDF loaded</span>
+    </div>
+  </div>
+
+  <div class="layout">
+    <!-- LEFT PANEL -->
+    <div class="left-panel">
+
+      <!-- UPLOAD ZONE -->
+      <div id="upload-zone">
+        <div class="upload-box" id="drop-zone" onclick="document.getElementById('file-input').click()" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="handleDrop(event)">
+          <div class="upload-icon">📄</div>
+          <h2>Upload your PDF</h2>
+          <p>Click here or drag and drop your textbook PDF</p>
+          <div class="upload-hint">Supports Class VI–X textbooks in Hindi, English, Kannada, Science, Social Science, Maths</div>
+        </div>
+        <input type="file" id="file-input" accept=".pdf" onchange="loadPDF(this.files[0])"/>
+      </div>
+
+      <!-- READER AREA -->
+      <div id="reader-area">
+        <!-- CONTROLS -->
+        <div class="controls-bar">
+          <button class="ctrl-btn primary" id="btn-play" onclick="playPause()">▶ Read</button>
+          <button class="ctrl-btn secondary" id="btn-restart-sent" onclick="restartSentence()" disabled>↺ Sentence</button>
+          <button class="ctrl-btn secondary" id="btn-restart-page" onclick="restartPage()">⏮ Page</button>
+          <div class="ctrl-sep"></div>
+          <div class="speed-wrap">
+            <span>Speed</span>
+            <input type="range" id="speed-slider" min="0.5" max="1.5" step="0.1" value="0.85" oninput="updateSpeed(this.value)"/>
+            <span class="speed-val" id="speed-val">0.85×</span>
+          </div>
+          <div class="ctrl-sep"></div>
+          <div class="page-nav">
+            <button onclick="changePage(-1)">◀</button>
+            <span id="page-info">Page 1 of 1</span>
+            <button onclick="changePage(1)">▶</button>
+          </div>
+          <button class="ctrl-btn danger" style="margin-left:8px" onclick="resetReader()" title="Load new PDF">✕ New</button>
+        </div>
+
+        <!-- STATUS BAR -->
+        <div class="status-bar">
+          <div class="status-dot" id="status-dot"></div>
+          <span id="status-text">Ready to read. Press ▶ Read to start.</span>
+        </div>
+
+        <!-- TEXT CONTENT -->
+        <div class="text-display" id="text-display"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL: VOCAB -->
+    <div class="right-panel">
+      <div class="right-header">
+        <h3>📝 Vocabulary</h3>
+        <p>Key words with Kannada meanings. Click to hear.</p>
+      </div>
+      <div class="vocab-list" id="vocab-list">
+        <div class="vocab-empty">
+          <div class="empty-icon">🔤</div>
+          <p>Important words will appear here as you read.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING OVERLAY -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="spinner-ring"></div>
+  <div class="loading-text" id="loading-text">Processing PDF…</div>
+</div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────
+// API key is handled server-side via /api/claude
+const PW = 'Numeracy2026';
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// ── PASSWORD ────────────────────────────────────────────────
+function checkPw() {
+  const v = document.getElementById('gate-input').value;
+  if (v === PW) {
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    sessionStorage.setItem('sr_unlocked', '1');
+  } else {
+    document.getElementById('gate-err').style.display = 'block';
+    document.getElementById('gate-input').value = '';
+    document.getElementById('gate-input').focus();
+  }
+}
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('gate-input').addEventListener('keydown', e => { if (e.key === 'Enter') checkPw(); });
+  if (sessionStorage.getItem('sr_unlocked')) {
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+  }
+  initVoices();
+  // Improve voice selection after delay (some browsers load voices late)
+  setTimeout(initVoices, 1200);
+});
+
+// ── PDF LOADING ─────────────────────────────────────────────
+let pdfDoc = null, allPages = [], currentPageIdx = 0;
+let paragraphs = []; // [{text, words, el, notesEl, quizEl, done}]
+let speechRate = 0.85;
+let speaking = false, paused = false;
+let currentUtter = null, currentWordIdx = 0, currentParaIdx = 0, currentSentIdx = 0;
+let sentences = []; // flat list of {paraIdx, sentIdx, sentText, words}
+let globalSentIdx = 0; // index into sentences[]
+let voices = [];
+let indianVoice = null;
+let vocabSet = new Set();
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type === 'application/pdf') loadPDF(f);
+}
+
+async function loadPDF(file) {
+  showLoading('Reading PDF…');
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    allPages = [];
+    for (let i = 1; i <= pdfDoc.numPages; i++) {
+      const page = await pdfDoc.getPage(i);
+      const tc = await page.getTextContent();
+      const pageText = tc.items.map(it => it.str).join(' ');
+      allPages.push(pageText);
+    }
+    document.getElementById('upload-zone').style.display = 'none';
+    document.getElementById('reader-area').style.display = 'flex';
+    document.getElementById('page-badge').textContent = `${pdfDoc.numPages} page${pdfDoc.numPages > 1 ? 's' : ''}`;
+    renderPage(0);
+  } catch(e) {
+    alert('Could not read PDF: ' + e.message);
+  }
+  hideLoading();
+}
+
+function renderPage(idx) {
+  currentPageIdx = idx;
+  const total = allPages.length;
+  document.getElementById('page-info').textContent = `Page ${idx+1} of ${total}`;
+  // Parse into paragraphs
+  const rawText = allPages[idx];
+  paragraphs = splitIntoParagraphs(rawText);
+  sentences = [];
+  renderParagraphs();
+}
+
+function splitIntoParagraphs(text) {
+  const cleaned = text.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+  let rawParas = cleaned.split(/\n\n+/).map(p => p.replace(/\n/g, ' ').trim()).filter(p => p.length > 30);
+  if (rawParas.length <= 1) {
+    const sents = cleaned.match(/[^.!?]+[.!?]+["\']?\s*/g) || [cleaned];
+    rawParas = [];
+    let chunk = [];
+    sents.forEach((s, i) => {
+      chunk.push(s.trim());
+      const isBreak = /^(However|Therefore|Moreover|Furthermore|In addition|First|Second|Third|Finally|Note that|Example|Definition)/i.test(s.trim());
+      if (chunk.length >= 4 || (chunk.length >= 2 && isBreak) || i === sents.length - 1) {
+        const joined = chunk.join(' ').trim();
+        if (joined.length > 30) rawParas.push(joined);
+        chunk = [];
+      }
+    });
+  }
+  const final = [];
+  rawParas.forEach(p => {
+    if (p.length <= 700) { final.push(p); return; }
+    const sents = p.match(/[^.!?]+[.!?]+["\']?\s*/g) || [p];
+    let chunk = [];
+    sents.forEach((s, i) => {
+      chunk.push(s.trim());
+      if (chunk.join(' ').length > 500 || i === sents.length - 1) {
+        const joined = chunk.join(' ').trim();
+        if (joined.length > 30) final.push(joined);
+        chunk = [];
+      }
+    });
+  });
+  return (final.length ? final : [cleaned]).map(p => ({ text: p, done: false }));
+}
+
+
+function renderParagraphs() {
+  const display = document.getElementById('text-display');
+  display.innerHTML = '';
+  sentences = [];
+  paragraphs.forEach((para, pi) => {
+    const block = document.createElement('div');
+    block.className = 'para-block';
+    block.id = `para-${pi}`;
+
+    const num = document.createElement('div');
+    num.className = 'para-num';
+    num.textContent = `§ ${pi + 1}`;
+    block.appendChild(num);
+
+    // Tokenize words
+    const textContainer = document.createElement('div');
+    textContainer.className = 'para-text';
+    // Split into sentences for TTS sync
+    const sentMatches = para.text.match(/[^.!?]+[.!?]+["']?\s*/g) || [para.text];
+    sentMatches.forEach((sent, si) => {
+      const words = sent.trim().split(/\s+/);
+      const globalSI = sentences.length;
+      sentences.push({ paraIdx: pi, sentIdx: si, sentText: sent.trim(), words, globalIdx: globalSI });
+      words.forEach((word, wi) => {
+        const span = document.createElement('span');
+        span.className = 'word-span';
+        span.textContent = word + ' ';
+        span.dataset.paraIdx = pi;
+        span.dataset.sentIdx = globalSI;
+        span.dataset.wordIdx = wi;
+        span.onclick = () => speakWord(word);
+        textContainer.appendChild(span);
+      });
+    });
+    block.appendChild(textContainer);
+
+    // Para actions
+    const actions = document.createElement('div');
+    actions.className = 'para-actions';
+    actions.style.display = 'none';
+
+    const btnNotes = document.createElement('button');
+    btnNotes.className = 'para-action-btn btn-notes';
+    btnNotes.innerHTML = '📒 Generate Notes';
+    btnNotes.onclick = () => generateNotes(pi);
+    actions.appendChild(btnNotes);
+
+    const btnQuiz = document.createElement('button');
+    btnQuiz.className = 'para-action-btn btn-quiz';
+    btnQuiz.innerHTML = '🧠 Take Quiz';
+    btnQuiz.onclick = () => generateQuiz(pi);
+    actions.appendChild(btnQuiz);
+
+    block.appendChild(actions);
+
+    // Notes container
+    const notesDiv = document.createElement('div');
+    notesDiv.className = 'notes-block';
+    notesDiv.id = `notes-${pi}`;
+    block.appendChild(notesDiv);
+
+    // Quiz container
+    const quizDiv = document.createElement('div');
+    quizDiv.className = 'quiz-block';
+    quizDiv.id = `quiz-${pi}`;
+    block.appendChild(quizDiv);
+
+    display.appendChild(block);
+    para.el = block;
+    para.actionsEl = actions;
+    para.notesEl = notesDiv;
+    para.quizEl = quizDiv;
+  });
+  globalSentIdx = 0;
+  stopSpeech();
+}
+
+function changePage(dir) {
+  const newIdx = currentPageIdx + dir;
+  if (newIdx < 0 || newIdx >= allPages.length) return;
+  stopSpeech();
+  renderPage(newIdx);
+}
+
+// ── SPEECH ──────────────────────────────────────────────────
+function initVoices() {
+  const loadVoices = () => {
+    voices = window.speechSynthesis.getVoices();
+    // Prefer Indian English voices
+    const pref = ['en-IN', 'en_IN', 'hi-IN'];
+    for (const p of pref) {
+      const v = voices.find(v => v.lang.includes(p) || v.name.toLowerCase().includes('india'));
+      if (v) { indianVoice = v; break; }
+    }
+    if (!indianVoice) indianVoice = voices.find(v => v.lang.startsWith('en')) || null;
+  };
+  loadVoices();
+  window.speechSynthesis.onvoiceschanged = loadVoices;
+}
+
+function speakWord(word) {
+  const clean = word.replace(/[^a-zA-Z\u0900-\u097F]/g, '');
+  if (!clean) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(clean);
+  u.rate = speechRate; u.pitch = 1;
+  if (indianVoice) u.voice = indianVoice;
+  window.speechSynthesis.speak(u);
+}
+
+function updateSpeed(v) {
+  speechRate = parseFloat(v);
+  document.getElementById('speed-val').textContent = v + '×';
+}
+
+function setStatus(msg, isSpeaking) {
+  document.getElementById('status-text').textContent = msg;
+  const dot = document.getElementById('status-dot');
+  dot.className = 'status-dot' + (isSpeaking ? ' speaking' : '');
+}
+
+function highlightWord(sentGlobalIdx, wordIdx) {
+  // Clear previous
+  document.querySelectorAll('.word-span.speaking').forEach(s => s.classList.remove('speaking'));
+  const spans = document.querySelectorAll(`.word-span[data-sent-idx="${sentGlobalIdx}"][data-word-idx="${wordIdx}"]`);
+  spans.forEach(s => {
+    s.classList.add('speaking');
+    s.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+}
+
+function clearHighlights() {
+  document.querySelectorAll('.word-span.speaking').forEach(s => s.classList.remove('speaking'));
+}
+
+// TTS: speak sentence by sentence, word highlight via estimated timing
+let ttsQueue = [];
+let ttsRunning = false;
+let pausedAt = -1;
+let currentSpeakingSentGlobal = -1;
+
+function playPause() {
+  if (speaking && !paused) {
+    // Pause
+    window.speechSynthesis.pause();
+    paused = true;
+    speaking = false;
+    document.getElementById('btn-play').textContent = '▶ Resume';
+    setStatus('Paused.', false);
+  } else if (paused) {
+    // Resume
+    window.speechSynthesis.resume();
+    paused = false;
+    speaking = true;
+    document.getElementById('btn-play').textContent = '⏸ Pause';
+    setStatus('Reading…', true);
+  } else {
+    // Start from current position
+    startReading(globalSentIdx);
+  }
+}
+
+function startReading(fromSentIdx) {
+  stopSpeech();
+  globalSentIdx = fromSentIdx;
+  speaking = true; paused = false;
+  document.getElementById('btn-play').textContent = '⏸ Pause';
+  document.getElementById('btn-restart-sent').disabled = false;
+  speakNextSentence();
+}
+
+function speakNextSentence() {
+  if (!speaking || globalSentIdx >= sentences.length) {
+    if (speaking) finishReading();
+    return;
+  }
+  const sent = sentences[globalSentIdx];
+  currentSpeakingSentGlobal = globalSentIdx;
+
+  // Highlight paragraph
+  paragraphs.forEach((p, i) => {
+    if (p.el) p.el.classList.toggle('active', i === sent.paraIdx);
+  });
+  p_el_scroll(sent.paraIdx);
+
+  const utter = new SpeechSynthesisUtterance(sent.sentText);
+  utter.rate = speechRate;
+  utter.pitch = 1.05;
+  if (indianVoice) utter.voice = indianVoice;
+
+  currentUtter = utter;
+
+  // Word boundary highlighting
+  utter.onboundary = (e) => {
+    if (e.name === 'word') {
+      // Estimate word index from character index
+      const charIdx = e.charIndex;
+      const textSoFar = sent.sentText.substring(0, charIdx);
+      const wordIdx = textSoFar.trim().split(/\s+/).length - 1;
+      highlightWord(globalSentIdx, Math.max(0, wordIdx));
+      // Extract key words for vocab
+      const word = sent.words[wordIdx] || '';
+      maybeAddVocab(word.replace(/[^a-zA-Z]/g, ''));
+    }
+  };
+
+  utter.onend = () => {
+    if (!speaking) return;
+    clearHighlights();
+    const prevPara = sent.paraIdx;
+    globalSentIdx++;
+    // Check if we just finished a paragraph
+    const nextSent = sentences[globalSentIdx];
+    if (!nextSent || nextSent.paraIdx !== prevPara) {
+      markParaDone(prevPara);
+    }
+    setStatus(`Read sentence ${globalSentIdx} of ${sentences.length}`, true);
+    speakNextSentence();
+  };
+
+  utter.onerror = () => { clearHighlights(); };
+
+  setStatus(`Reading paragraph ${sent.paraIdx + 1}…`, true);
+  window.speechSynthesis.speak(utter);
+}
+
+function p_el_scroll(paraIdx) {
+  const el = paragraphs[paraIdx]?.el;
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function markParaDone(paraIdx) {
+  const para = paragraphs[paraIdx];
+  if (!para || para.done) return;
+  para.done = true;
+  if (para.el) { para.el.classList.add('done'); para.el.classList.remove('active'); }
+  if (para.el) para.el.querySelector('.para-num').style.background = '#0D9488';
+  if (para.actionsEl) para.actionsEl.style.display = 'flex';
+}
+
+function finishReading() {
+  speaking = false; paused = false;
+  clearHighlights();
+  document.getElementById('btn-play').textContent = '▶ Read';
+  setStatus('Finished reading this page. 🎉', false);
+  paragraphs.forEach((_, i) => markParaDone(i));
+}
+
+function stopSpeech() {
+  window.speechSynthesis.cancel();
+  speaking = false; paused = false;
+  clearHighlights();
+  document.getElementById('btn-play').textContent = '▶ Read';
+  document.getElementById('btn-restart-sent').disabled = true;
+  setStatus('Ready to read. Press ▶ Read to start.', false);
+}
+
+function restartSentence() {
+  if (globalSentIdx > 0) {
+    const gi = Math.max(0, currentSpeakingSentGlobal);
+    startReading(gi);
+  }
+}
+
+function restartPage() {
+  stopSpeech();
+  globalSentIdx = 0;
+  currentSpeakingSentGlobal = -1;
+  // Reset para done states for display only (don't hide action buttons already shown)
+  paragraphs.forEach(p => { if(p.el) p.el.classList.remove('active'); });
+  clearHighlights();
+  setStatus('Ready to read from beginning. Press ▶ Read.', false);
+  document.getElementById('btn-play').textContent = '▶ Read';
+}
+
+function resetReader() {
+  stopSpeech();
+  pdfDoc = null; allPages = []; paragraphs = []; sentences = [];
+  vocabSet.clear();
+  document.getElementById('vocab-list').innerHTML = '<div class="vocab-empty"><div class="empty-icon">🔤</div><p>Important words will appear here as you read.</p></div>';
+  document.getElementById('upload-zone').style.display = 'flex';
+  document.getElementById('reader-area').style.display = 'none';
+  document.getElementById('page-badge').textContent = 'No PDF loaded';
+}
+
+// ── VOCABULARY ───────────────────────────────────────────────
+const commonWords = new Set('the a an is are was were be been being have has had do does did will would could should may might shall can to of in on at by for with from as it its this that these those i you he she we they me him her us them my your his our their i am'.split(' '));
+
+async function maybeAddVocab(word) {
+  if (!word || word.length < 4) return;
+  const w = word.toLowerCase();
+  if (commonWords.has(w) || vocabSet.has(w)) return;
+  vocabSet.add(w);
+  addVocabItem(word);
+}
+
+function addVocabItem(word) {
+  const list = document.getElementById('vocab-list');
+  // Remove empty state
+  const empty = list.querySelector('.vocab-empty');
+  if (empty) empty.remove();
+
+  const item = document.createElement('div');
+  item.className = 'vocab-item';
+  item.id = `vocab-${word.toLowerCase()}`;
+  item.innerHTML = `<div class="vocab-en"><span>📣</span><strong>${word}</strong><span class="speak-icon">🔊</span></div><div class="vocab-kn vocab-kn-loading">Loading ಕನ್ನಡ meaning…</div>`;
+  item.onclick = () => speakWord(word);
+  list.appendChild(item);
+  // Scroll to bottom
+  list.scrollTop = list.scrollHeight;
+  // Fetch Kannada meaning
+  fetchKannadaMeaning(word, item);
+}
+
+async function fetchKannadaMeaning(word, el) {
+  try {
+    const res = await callClaude(`You are a bilingual dictionary. For the English word "${word}", provide:
+1. A very short Kannada translation or synonym (1-3 words in Kannada script)
+2. A short definition in simple English (max 8 words)
+
+Respond in this exact format only:
+KANNADA: [Kannada word(s)]
+MEANING: [short English definition]`);
+    const knMatch = res.match(/KANNADA:\s*(.+)/);
+    const meMatch = res.match(/MEANING:\s*(.+)/);
+    const kn = knMatch ? knMatch[1].trim() : '—';
+    const me = meMatch ? meMatch[1].trim() : '';
+    const knDiv = el.querySelector('.vocab-kn');
+    if (knDiv) {
+      knDiv.className = 'vocab-kn';
+      knDiv.innerHTML = `<strong style="color:#FF6B00">${kn}</strong>${me ? `<br><span style="font-size:11px;color:#78716C">${me}</span>` : ''}`;
+    }
+  } catch(e) {
+    const knDiv = el.querySelector('.vocab-kn');
+    if (knDiv) knDiv.textContent = '—';
+  }
+}
+
+// ── NOTES GENERATION ─────────────────────────────────────────
+async function generateNotes(paraIdx) {
+  const para = paragraphs[paraIdx];
+  if (!para) return;
+  const notesEl = para.notesEl;
+  notesEl.style.display = 'block';
+  notesEl.innerHTML = `<h4>📒 Quick Notes</h4><div class="ai-loading"><span class="dot-flashing"></span><span class="dot-flashing"></span><span class="dot-flashing"></span><span style="margin-left:6px;font-size:13px;color:#9CA3AF">Generating notes…</span></div>`;
+
+  const prompt = `You are a helpful teacher for Indian Class VI–X students creating concise study notes.
+
+Paragraph to analyse:
+"""${para.text}"""
+
+Instructions:
+- Choose the BEST format for this content:
+  * Bullet points: for lists of facts, features, causes, effects
+  * Table with headers: for comparisons, data, formulas, events with dates, properties
+  * Definition + example: for new terms or concepts
+  * Numbered steps: for processes or methods
+  * Short paragraph: for narrative or descriptive content
+  * ASCII diagram with description: for spatial concepts, diagrams, cycles (use [  ] boxes and arrows ->)
+- Use simple, short sentences (max 12 words each)
+- Maximum 7 items in any list, 5 rows in any table
+- End with one bold KEY TAKEAWAY sentence
+
+Return ONLY clean HTML using: <p>, <ul>, <li>, <ol>, <table>, <tr>, <th>, <td>, <strong>, <em>, <br>. No markdown, no preamble, no explanation. Start directly with the HTML content.`;
+
+  try {
+    const html = await callClaude(prompt);
+    notesEl.innerHTML = `<h4>📒 Quick Notes — Paragraph ${paraIdx + 1}</h4><div class="notes-content">${html}</div>`;
+  } catch(e) {
+    notesEl.innerHTML = `<h4>📒 Quick Notes</h4><p style="color:red;font-size:13px">Could not generate notes. Please try again.</p>`;
+  }
+}
+
+// ── QUIZ GENERATION ──────────────────────────────────────────
+let quizData = {}; // paraIdx -> {questions, current, score, answered}
+
+async function generateQuiz(paraIdx) {
+  const para = paragraphs[paraIdx];
+  if (!para) return;
+  const quizEl = para.quizEl;
+  quizEl.style.display = 'block';
+  quizEl.innerHTML = `<h4>🧠 Quiz — Paragraph ${paraIdx + 1}</h4><div class="ai-loading"><span class="dot-flashing"></span><span class="dot-flashing"></span><span class="dot-flashing"></span><span style="margin-left:6px;font-size:13px;color:#9CA3AF">Creating questions…</span></div>`;
+
+  const prompt = `You are a teacher creating a quiz for Indian Class VI–X students.
+Create exactly 4 questions based ONLY on this paragraph. Mix question types.
+
+Paragraph:
+"""${para.text}"""
+
+Use these types:
+- "mcq": 4 options A/B/C/D, one correct answer (use the EXACT option text as answer)
+- "truefalse": statement is True or False (answer must be exactly "True" or "False")
+- "fillblank": sentence with ___ for missing word (answer is the missing word/phrase)
+- "match": matching two columns (left[] and right[] arrays, pairs[] shows correct index matches)
+
+Return ONLY a valid JSON array, no other text, no markdown:
+[
+  {"type":"mcq","question":"What is photosynthesis?","options":["Making food using sunlight","Breathing process","Digestion","Excretion"],"answer":"Making food using sunlight","explanation":"Photosynthesis is the process by which plants make food using sunlight, water and CO2."},
+  {"type":"truefalse","question":"Plants release oxygen during photosynthesis.","answer":"True","explanation":"Yes, oxygen is a by-product of photosynthesis."},
+  {"type":"fillblank","question":"Photosynthesis takes place in the ___ of the leaf.","answer":"chloroplast","explanation":"Chloroplasts contain chlorophyll which absorbs sunlight for photosynthesis."},
+  {"type":"mcq","question":"Which gas do plants absorb during photosynthesis?","options":["Oxygen","Nitrogen","Carbon dioxide","Hydrogen"],"answer":"Carbon dioxide","explanation":"Plants absorb CO2 from the air through tiny pores called stomata."}
+]`;
+
+  try {
+    let raw = await callClaude(prompt);
+    raw = raw.replace(/```json|```/g, '').trim();
+    const questions = JSON.parse(raw);
+    quizData[paraIdx] = { questions, current: 0, score: 0, answered: 0 };
+    renderQuizQuestion(paraIdx);
+  } catch(e) {
+    quizEl.innerHTML = `<h4>🧠 Quiz</h4><p style="color:red;font-size:13px">Could not generate quiz. Please try again.</p>`;
+  }
+}
+
+function renderQuizQuestion(paraIdx) {
+  const qd = quizData[paraIdx];
+  if (!qd) return;
+  const quizEl = paragraphs[paraIdx].quizEl;
+  const { questions, current } = qd;
+
+  if (current >= questions.length) {
+    // Show score
+    const pct = Math.round((qd.score / questions.length) * 100);
+    let emoji = pct >= 80 ? '🏆' : pct >= 50 ? '👍' : '💪';
+    let msg = pct >= 80 ? 'Excellent work!' : pct >= 50 ? 'Good effort! Review the notes.' : 'Keep practising! Read the paragraph again.';
+    quizEl.innerHTML = `<h4>🧠 Quiz Complete!</h4>
+    <div class="quiz-score" style="display:block">
+      <div class="score-num">${emoji} ${qd.score}/${questions.length}</div>
+      <p>${pct}% — ${msg}</p>
+      <button onclick="resetQuiz(${paraIdx})" style="margin-top:12px;padding:8px 18px;border-radius:8px;border:none;background:var(--indigo);color:white;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer">🔄 Retry Quiz</button>
+    </div>`;
+    return;
+  }
+
+  const q = questions[current];
+  const progress = `Question ${current + 1} of ${questions.length}`;
+
+  let qHtml = `<h4>🧠 Quiz — Paragraph ${paraIdx + 1}</h4>
+    <div class="quiz-progress">${progress} &nbsp;|&nbsp; Score: ${qd.score}</div>
+    <div class="quiz-q">${current + 1}. ${q.question}</div>`;
+
+  if (q.type === 'mcq') {
+    qHtml += `<div class="quiz-options">`;
+    q.options.forEach((opt, i) => {
+      qHtml += `<button class="quiz-opt" onclick="answerMCQ(${paraIdx}, ${i}, '${escQ(opt)}', '${escQ(q.answer)}', '${escQ(q.explanation)}')">${String.fromCharCode(65+i)}. ${opt}</button>`;
+    });
+    qHtml += `</div>`;
+  } else if (q.type === 'truefalse') {
+    qHtml += `<div class="quiz-options">
+      <button class="quiz-opt" onclick="answerTF(${paraIdx}, 'True', '${escQ(q.answer)}', '${escQ(q.explanation)}')">✅ True</button>
+      <button class="quiz-opt" onclick="answerTF(${paraIdx}, 'False', '${escQ(q.answer)}', '${escQ(q.explanation)}')">❌ False</button>
+    </div>`;
+  } else if (q.type === 'fillblank') {
+    qHtml += `<input class="quiz-fill-input" id="fill-${paraIdx}" type="text" placeholder="Type your answer…"/>
+    <button class="quiz-submit" onclick="answerFill(${paraIdx}, '${escQ(q.answer)}', '${escQ(q.explanation)}')">Submit</button>`;
+  } else if (q.type === 'match') {
+    if (q.left && q.right) {
+      qHtml += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">`;
+      qHtml += `<div style="font-weight:600;font-size:12px;color:var(--text3);padding:4px 0">Column A</div><div style="font-weight:600;font-size:12px;color:var(--text3);padding:4px 0">Column B</div>`;
+      q.left.forEach((l, i) => {
+        qHtml += `<div style="padding:7px 12px;background:white;border-radius:8px;border:1.5px solid var(--indigo-mid);font-size:14px">${String.fromCharCode(65+i)}. ${l}</div>`;
+        qHtml += `<select class="match-sel" id="match-${paraIdx}-${i}" style="padding:7px;border-radius:8px;border:1.5px solid var(--indigo-mid);font-family:inherit;font-size:13px;background:white"><option value="">Select…</option>${q.right.map((r,ri)=>`<option value="${ri}">${ri+1}. ${r}</option>`).join('')}</select>`;
+      });
+      qHtml += `</div>`;
+      qHtml += `<button class="quiz-submit" onclick="answerMatch(${paraIdx}, ${JSON.stringify(q.pairs||[]).replace(/"/g,'&quot;')}, '${escQ(q.explanation)}')">Check Matches</button>`;
+    }
+  }
+
+  qHtml += `<div class="quiz-feedback" id="qfb-${paraIdx}"></div>
+    <button class="quiz-next" id="qnext-${paraIdx}" onclick="nextQuestion(${paraIdx})">Next Question →</button>`;
+
+  quizEl.innerHTML = qHtml;
+}
+
+function escQ(s) { return (s || '').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+
+function answerMCQ(paraIdx, optIdx, chosen, correct, explanation) {
+  const qd = quizData[paraIdx];
+  const quizEl = paragraphs[paraIdx].quizEl;
+  const opts = quizEl.querySelectorAll('.quiz-opt');
+  opts.forEach(o => o.disabled = true);
+  const isCorrect = chosen.trim().toLowerCase() === correct.trim().toLowerCase();
+  opts[optIdx].classList.add(isCorrect ? 'correct' : 'wrong');
+  // Also highlight correct
+  if (!isCorrect) {
+    opts.forEach(o => { if (o.textContent.includes(correct)) o.classList.add('correct'); });
+  }
+  showFeedback(paraIdx, isCorrect, explanation);
+  if (isCorrect) qd.score++;
+  qd.answered++;
+}
+
+function answerTF(paraIdx, chosen, correct, explanation) {
+  const qd = quizData[paraIdx];
+  const quizEl = paragraphs[paraIdx].quizEl;
+  const opts = quizEl.querySelectorAll('.quiz-opt');
+  opts.forEach(o => o.disabled = true);
+  const isCorrect = chosen === correct;
+  opts.forEach(o => {
+    if (o.textContent.includes(chosen)) o.classList.add(isCorrect ? 'correct' : 'wrong');
+    if (!isCorrect && o.textContent.includes(correct)) o.classList.add('correct');
+  });
+  showFeedback(paraIdx, isCorrect, explanation);
+  if (isCorrect) qd.score++;
+  qd.answered++;
+}
+
+function answerFill(paraIdx, correct, explanation) {
+  const qd = quizData[paraIdx];
+  const inp = document.getElementById(`fill-${paraIdx}`);
+  if (!inp) return;
+  const val = inp.value.trim().toLowerCase();
+  const isCorrect = val === correct.trim().toLowerCase() || correct.toLowerCase().includes(val);
+  inp.disabled = true;
+  inp.style.borderColor = isCorrect ? 'var(--green)' : 'var(--rose)';
+  inp.style.background = isCorrect ? 'var(--green-light)' : 'var(--rose-light)';
+  showFeedback(paraIdx, isCorrect, `Correct answer: ${correct}. ${explanation}`);
+  if (isCorrect) qd.score++;
+  qd.answered++;
+}
+
+function answerMatch(paraIdx, pairs, explanation) {
+  const qd = quizData[paraIdx];
+  const quizEl = paragraphs[paraIdx].quizEl;
+  const sels = quizEl.querySelectorAll('.match-sel');
+  let allCorrect = true;
+  sels.forEach((sel, i) => {
+    sel.disabled = true;
+    const expected = pairs[i];
+    const chosen = parseInt(sel.value);
+    if (chosen === expected) {
+      sel.style.borderColor = 'var(--green)'; sel.style.background = 'var(--green-light)';
+    } else {
+      sel.style.borderColor = 'var(--rose)'; sel.style.background = 'var(--rose-light)';
+      allCorrect = false;
+    }
+  });
+  showFeedback(paraIdx, allCorrect, explanation);
+  if (allCorrect) qd.score++;
+  qd.answered++;
+}
+
+function showFeedback(paraIdx, isCorrect, explanation) {
+  const fb = document.getElementById(`qfb-${paraIdx}`);
+  const nxt = document.getElementById(`qnext-${paraIdx}`);
+  if (fb) {
+    fb.style.display = 'block';
+    fb.className = `quiz-feedback ${isCorrect ? 'correct' : 'wrong'}`;
+    fb.innerHTML = `${isCorrect ? '✅ Correct!' : '❌ Not quite.'} <span style="font-weight:400">${explanation}</span>`;
+  }
+  if (nxt) nxt.style.display = 'inline-block';
+}
+
+function nextQuestion(paraIdx) {
+  quizData[paraIdx].current++;
+  renderQuizQuestion(paraIdx);
+}
+
+function resetQuiz(paraIdx) {
+  const qd = quizData[paraIdx];
+  if (qd) { qd.current = 0; qd.score = 0; qd.answered = 0; }
+  renderQuizQuestion(paraIdx);
+}
+
+// ── CLAUDE API (routed via Vercel serverless proxy) ─────────
+async function callClaude(prompt, max_tokens) {
+  const res = await fetch('/api/claude', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt, max_tokens: max_tokens || 1000 })
+  });
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error(e.error || `API error ${res.status}`);
+  }
+  const data = await res.json();
+  return data.text || '';
+}
+
+// ── UTILITIES ────────────────────────────────────────────────
+function showLoading(msg) {
+  document.getElementById('loading-text').textContent = msg || 'Loading…';
+  document.getElementById('loading-overlay').classList.add('show');
+}
+function hideLoading() {
+  document.getElementById('loading-overlay').classList.remove('show');
+}
+</script>
+</body>
+</html>
