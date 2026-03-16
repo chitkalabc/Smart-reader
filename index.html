@@ -185,6 +185,14 @@ body {
   display: inline;
 }
 .word-span:hover { background: var(--saffron-light); }
+.word-span:hover::after {
+  content: attr(title);
+  position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%);
+  background: #1C1917; color: white; font-size: 10px; padding: 3px 7px;
+  border-radius: 4px; white-space: nowrap; pointer-events: none; opacity: 0.85; z-index: 10;
+}
+.word-span { position: relative; }
+.para-num:hover { background: var(--saffron) !important; transform: scale(1.05); transition: all 0.15s; }
 .word-span.speaking { background: #FEF08A; color: #713F12; font-weight: 600; padding: 0 2px; border-radius: 3px; }
 .word-span.key-word { border-bottom: 2px solid var(--saffron); }
 .word-span.key-word.speaking { background: var(--saffron); color: white; }
@@ -573,7 +581,15 @@ function renderParagraphs() {
 
     const num = document.createElement('div');
     num.className = 'para-num';
-    num.textContent = `§ ${pi + 1}`;
+    num.title = 'Click to read from this paragraph';
+    num.style.cursor = 'pointer';
+    const firstSentGlobal = sentences.length; // will be set after sentences are pushed
+    num.textContent = `▶ §${pi + 1}`;
+    num.onclick = () => {
+      // Find the first sentence of this paragraph
+      const firstSent = sentences.find(s => s.paraIdx === pi);
+      if (firstSent !== undefined) startReading(firstSent.globalIdx);
+    };
     block.appendChild(num);
 
     // Tokenize words
@@ -592,16 +608,24 @@ function renderParagraphs() {
         span.dataset.paraIdx = pi;
         span.dataset.sentIdx = globalSI;
         span.dataset.wordIdx = wi;
-        span.onclick = () => speakWord(word);
+        span.onclick = (e) => {
+          if (e.shiftKey) {
+            // Shift+click = start reading from this sentence
+            startReading(globalSI);
+          } else {
+            speakWord(word);
+          }
+        };
+        span.title = 'Click to hear word · Shift+Click to read from here';
         textContainer.appendChild(span);
       });
     });
     block.appendChild(textContainer);
 
-    // Para actions
+    // Para actions — always visible so user can generate notes/quiz anytime
     const actions = document.createElement('div');
     actions.className = 'para-actions';
-    actions.style.display = 'none';
+    actions.style.display = 'flex';
 
     const btnNotes = document.createElement('button');
     btnNotes.className = 'para-action-btn btn-notes';
@@ -848,14 +872,33 @@ function resetReader() {
 }
 
 // ── VOCABULARY ───────────────────────────────────────────────
-const commonWords = new Set('the a an is are was were be been being have has had do does did will would could should may might shall can to of in on at by for with from as it its this that these those i you he she we they me him her us them my your his our their i am'.split(' '));
+// Extended stop-word list to avoid trivial words
+const commonWords = new Set(('the a an is are was were be been being have has had do does did will would could should may might shall can to of in on at by for with from as it its this that these those i you he she we they me him her us them my your his our their also each every just like more most much no not only or other our out same so some such than then there these they this those through too under up very well what when where which while who with would yet above about after again against all along also although among another any because before between both come did down each far few first four from get give go good great had how into its just know last left life little long made make many more most must name need never next now number off often old once only open order our out over own place point put read right same saw say see should show side small some something still such take than that then there these think three through time to too try turn two under until up us use very want way well were what when which while who with work world would write year you your'.split(' ')));
+
+// Only add a word if it appears important (longer, less common, content word)
+const vocabQueue = [];
+let vocabProcessing = false;
 
 async function maybeAddVocab(word) {
-  if (!word || word.length < 4) return;
-  const w = word.toLowerCase();
-  if (commonWords.has(w) || vocabSet.has(w)) return;
+  if (!word || word.length < 5) return;
+  const w = word.toLowerCase().replace(/[^a-z]/g,'');
+  if (!w || commonWords.has(w) || vocabSet.has(w)) return;
+  // Only add nouns/adjectives/verbs — skip words that look like numbers or abbreviations
+  if (/^\d+$/.test(w) || w.length < 5) return;
   vocabSet.add(w);
-  addVocabItem(word);
+  vocabQueue.push(word);
+  if (!vocabProcessing) processVocabQueue();
+}
+
+async function processVocabQueue() {
+  vocabProcessing = true;
+  while (vocabQueue.length > 0) {
+    const word = vocabQueue.shift();
+    addVocabItem(word);
+    // Throttle: wait 1.5s between API calls to avoid flooding
+    await new Promise(r => setTimeout(r, 1500));
+  }
+  vocabProcessing = false;
 }
 
 function addVocabItem(word) {
@@ -895,8 +938,9 @@ MEANING: [short English definition]`);
       knDiv.innerHTML = `<strong style="color:#FF6B00">${kn}</strong>${me ? `<br><span style="font-size:11px;color:#78716C">${me}</span>` : ''}`;
     }
   } catch(e) {
+    console.error('Vocab error for', word, e);
     const knDiv = el.querySelector('.vocab-kn');
-    if (knDiv) knDiv.textContent = '—';
+    if (knDiv) { knDiv.className = 'vocab-kn'; knDiv.textContent = '(meaning unavailable)'; }
   }
 }
 
@@ -928,10 +972,14 @@ Instructions:
 Return ONLY clean HTML using: <p>, <ul>, <li>, <ol>, <table>, <tr>, <th>, <td>, <strong>, <em>, <br>. No markdown, no preamble, no explanation. Start directly with the HTML content.`;
 
   try {
-    const html = await callClaude(prompt);
+    const html = await callClaude(prompt, 1200);
     notesEl.innerHTML = `<h4>📒 Quick Notes — Paragraph ${paraIdx + 1}</h4><div class="notes-content">${html}</div>`;
+    // Show quiz button hint
+    const qBtn = para.actionsEl ? para.actionsEl.querySelector('.btn-quiz') : null;
+    if (qBtn) qBtn.style.animation = 'none';
   } catch(e) {
-    notesEl.innerHTML = `<h4>📒 Quick Notes</h4><p style="color:red;font-size:13px">Could not generate notes. Please try again.</p>`;
+    console.error('Notes error:', e);
+    notesEl.innerHTML = `<h4>📒 Quick Notes</h4><p style="color:red;font-size:13px">⚠️ ${e.message}. Please try again.</p>`;
   }
 }
 
@@ -966,13 +1014,20 @@ Return ONLY a valid JSON array, no other text, no markdown:
 ]`;
 
   try {
-    let raw = await callClaude(prompt);
+    let raw = await callClaude(prompt, 1500);
+    // Robust JSON extraction: find the array between [ and ]
     raw = raw.replace(/```json|```/g, '').trim();
+    const arrStart = raw.indexOf('[');
+    const arrEnd = raw.lastIndexOf(']');
+    if (arrStart === -1 || arrEnd === -1) throw new Error('Invalid response format');
+    raw = raw.substring(arrStart, arrEnd + 1);
     const questions = JSON.parse(raw);
+    if (!Array.isArray(questions) || questions.length === 0) throw new Error('No questions returned');
     quizData[paraIdx] = { questions, current: 0, score: 0, answered: 0 };
     renderQuizQuestion(paraIdx);
   } catch(e) {
-    quizEl.innerHTML = `<h4>🧠 Quiz</h4><p style="color:red;font-size:13px">Could not generate quiz. Please try again.</p>`;
+    console.error('Quiz error:', e);
+    quizEl.innerHTML = `<h4>🧠 Quiz</h4><p style="color:red;font-size:13px">⚠️ ${e.message}. Please try again.</p>`;
   }
 }
 
